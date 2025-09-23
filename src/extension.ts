@@ -4,8 +4,7 @@ import { generateImage } from './comfyui';
 export function activate(context: vscode.ExtensionContext) {
   const disposable = vscode.commands.registerCommand('comfyui.generateImage', async () => {
     const config = vscode.workspace.getConfiguration('comfyui');
-    const serverUrl = config.get<string>('serverUrl') || 'http://localhost:8188';
-    const apiKey = config.get<string>('apiKey');
+    console.log('Retrieved workflowTemplate from config:', config.get('workflowTemplate'));
 
     const prompt = await vscode.window.showInputBox({
       prompt: 'Enter your image generation prompt',
@@ -24,8 +23,9 @@ export function activate(context: vscode.ExtensionContext) {
 
     try {
       vscode.window.showInformationMessage('Generating image with ComfyUI...');
-      const filename = await generateImage(prompt, serverUrl, apiKey);
-      vscode.window.showInformationMessage(`Image generated and saved: ${filename}`);
+      const filenames = await generateImage(prompt, config);
+      const message = `Image(s) generated and saved: ${filenames.join(', ')}`;
+      vscode.window.showInformationMessage(message);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'An unknown error occurred.';
       vscode.window.showErrorMessage(`Failed to generate image: ${message}`);
