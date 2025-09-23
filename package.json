@@ -1,0 +1,52 @@
+{
+  "name": "vscode-comfyui-linker",
+  "displayName": "ComfyUI Linker",
+  "description": "A VSCode extension to generate images using ComfyUI",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:comfyui.generateImage"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "comfyui.generateImage",
+        "title": "Generate Image with ComfyUI"
+      }
+    ],
+    "configuration": {
+      "title": "ComfyUI",
+      "properties": {
+        "comfyui.serverUrl": {
+          "type": "string",
+          "default": "http://localhost:8188",
+          "description": "ComfyUI server URL"
+        },
+        "comfyui.apiKey": {
+          "type": "string",
+          "description": "API key for hosted ComfyUI servers"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.80.0",
+    "@types/node": "16.x",
+    "typescript": "~5.1.6"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yi-juwu/vscode-comfyui-linker.git"
+  }
+}
