@@ -1,14 +1,23 @@
 {
   "name": "vscode-comfyui-linker",
   "displayName": "ComfyUI Linker",
-  "description": "A VSCode extension to generate images using ComfyUI",
-  "version": "0.0.10",
+  "publisher": "markuswu",
+  "description": "Generate AI images with ComfyUI workflows directly in VSCode. Enter text prompts, monitor real-time progress via WebSocket, and auto-save outputs to your workspace.",
+  "version": "0.0.11",
   "icon": "icon.png",
   "engines": {
     "vscode": "^1.80.0"
   },
   "categories": [
-    "Other"
+    "Machine Learning"
+  ],
+  "keywords": [
+    "comfyui",
+    "stable diffusion",
+    "ai",
+    "image generation",
+    "machine learning",
+    "vscode extension"
   ],
   "activationEvents": [
     "onCommand:comfyui.generateImage"
@@ -67,6 +76,6 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/yi-juwu/vscode-comfyui-linker.git"
+    "url": "https://github.com/motephyr/vscode-comfyui-linker.git"
   }
 }

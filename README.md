@@ -12,15 +12,11 @@ A VSCode extension that enables seamless image generation using ComfyUI workflow
 
 ## Installation
 
-1. **From VSCode Marketplace** (Recommended):
-   - Open VSCode.
-   - Go to the Extensions view (`Ctrl+Shift+X` or `Cmd+Shift+X` on macOS).
-   - Search for "ComfyUI Linker".
-   - Click Install.
-
-2. **From VSIX File**:
-   - Download the `.vsix` file from the [GitHub Releases](https://github.com/yi-juwu/vscode-comfyui-linker/releases).
-   - In VSCode, go to Extensions > ... > Install from VSIX... and select the file.
+**From VSCode Marketplace** (Recommended):
+- Open VSCode.
+- Go to the Extensions view (`Ctrl+Shift+X` or `Cmd+Shift+X` on macOS).
+- Search for "ComfyUI Linker".
+- Click Install.
 
 After installation, reload VSCode if prompted.
 
