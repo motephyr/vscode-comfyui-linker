@@ -3,6 +3,7 @@
   "displayName": "ComfyUI Linker",
   "description": "A VSCode extension to generate images using ComfyUI",
   "version": "0.0.9",
+  "icon": "icon.png",
   "engines": {
     "vscode": "^1.80.0"
   },
