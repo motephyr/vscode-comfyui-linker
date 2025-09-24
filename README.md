@@ -24,6 +24,7 @@ After installation, reload VSCode if prompted.
 
 1. **Prerequisites Setup**:
    - Ensure a ComfyUI server is running (default: `http://localhost:8188`).
+   - Set the serverUrl, apiKey, workflowTemplate, promptNodeId, promptInputKey value.
    - Open a workspace folder in VSCode where images will be saved.
 
 2. **Generate an Image**:
@@ -31,13 +32,6 @@ After installation, reload VSCode if prompted.
    - Enter your text prompt (e.g., "a beautiful landscape").
    - The extension will connect to the server, show progress in a preview panel, and save the image(s) to your workspace.
 
-3. **Preview an Image**:
-   - Run `ComfyUI Linker: Preview Image`.
-   - Enter a prompt to generate and view the image in the preview panel without saving.
-
-4. **Save an Image**:
-   - Run `ComfyUI Linker: Save Image`.
-   - Enter a prompt; the image will be generated and saved to the workspace.
 
 Images are saved as PNG files with prefixes like `comfyui_saved_` or `comfyui_preview_generated_`.
 
