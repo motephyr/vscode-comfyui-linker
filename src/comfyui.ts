@@ -9,7 +9,7 @@ import * as crypto from 'crypto';
  * Manages WebSocket connection to ComfyUI server for real-time progress and preview updates.
  * Handles reconnection logic and message parsing for progress and PreviewImage outputs.
  */
-class WebSocketManager {
+export class WebSocketManager {
   private ws: ws.WebSocket | null = null;
   private url: string;
   private promptId: string;
@@ -106,7 +106,7 @@ class WebSocketManager {
   }
 }
 
-const DEFAULT_WORKFLOW_TEMPLATE = `{"3":{"inputs":{"text":"negative prompt","clip":["4",0]},"class_type":"CLIPTextEncode","_meta":{"title":"CLIP Text Encode (Prompt)"}},"4":{"inputs":{"ckpt_name":"sd15.safetensors"},"class_type":"CheckpointLoaderSimple","_meta":{"title":"Load Checkpoint"}},"5":{"inputs":{"width":512,"height":512,"batch_size":1},"class_type":"EmptyLatentImage","_meta":{"title":"Empty Latent Image"}},"6":{"inputs":{"text":"a beautiful landscape","clip":["4",0]},"class_type":"CLIPTextEncode","_meta":{"title":"CLIP Text Encode (Prompt)"}},"7":{"inputs":{"seed":123456789,"steps":20,"cfg":8,"sampler_name":"euler","scheduler":"normal","denoise":1,"model":["4",0],"positive":["6",0],"negative":["3",0],"latent_image":["5",0]},"class_type":"KSampler","_meta":{"title":"KSampler"}},"8":{"inputs":{"samples":["7",0],"vae":["4",2]},"class_type":"VAEDecode","_meta":{"title":"VAE Decode"}},"9":{"inputs":{"filename_prefix":"ComfyUI","images":["8",0]},"class_type":"SaveImage","_meta":{"title":"Save Image"}},"links":[["4",0,"6",1],["4",0,"3",1],["5",0,"7",3],["6",0,"7",1],["3",0,"7",2],["4",0,"7",0],["7",0,"8",0],["4",2,"8",1],["8",0,"9",0]],"version":0.4}`;
+export const DEFAULT_WORKFLOW_TEMPLATE = `{"3":{"inputs":{"text":"negative prompt","clip":["4",0]},"class_type":"CLIPTextEncode","_meta":{"title":"CLIP Text Encode (Prompt)"}},"4":{"inputs":{"ckpt_name":"sd15.safetensors"},"class_type":"CheckpointLoaderSimple","_meta":{"title":"Load Checkpoint"}},"5":{"inputs":{"width":512,"height":512,"batch_size":1},"class_type":"EmptyLatentImage","_meta":{"title":"Empty Latent Image"}},"6":{"inputs":{"text":"a beautiful landscape","clip":["4",0]},"class_type":"CLIPTextEncode","_meta":{"title":"CLIP Text Encode (Prompt)"}},"7":{"inputs":{"seed":123456789,"steps":20,"cfg":8,"sampler_name":"euler","scheduler":"normal","denoise":1,"model":["4",0],"positive":["6",0],"negative":["3",0],"latent_image":["5",0]},"class_type":"KSampler","_meta":{"title":"KSampler"}},"8":{"inputs":{"samples":["7",0],"vae":["4",2]},"class_type":"VAEDecode","_meta":{"title":"VAE Decode"}},"9":{"inputs":{"filename_prefix":"ComfyUI","images":["8",0]},"class_type":"SaveImage","_meta":{"title":"Save Image"}},"links":[["4",0,"6",1],["4",0,"3",1],["5",0,"7",3],["6",0,"7",1],["3",0,"7",2],["4",0,"7",0],["7",0,"8",0],["4",2,"8",1],["8",0,"9",0]],"version":0.4}`;
 
 /**
  * Fetches an image from the ComfyUI server with retry logic for transient errors.
@@ -117,7 +117,7 @@ const DEFAULT_WORKFLOW_TEMPLATE = `{"3":{"inputs":{"text":"negative prompt","cli
  * @param maxRetries - Maximum number of retries.
  * @returns The response if successful, or throws on failure.
  */
-async function fetchImageWithRetry(
+export async function fetchImageWithRetry(
   serverUrl: string,
   filename: string,
   subfolder: string,
@@ -157,7 +157,7 @@ async function fetchImageWithRetry(
  * @param maxRetries - Maximum number of retries.
  * @returns The history data if successful, or throws on failure.
  */
-async function fetchHistoryWithRetry(
+export async function fetchHistoryWithRetry(
   serverUrl: string,
   promptId: string,
   maxRetries: number = 3
@@ -200,7 +200,7 @@ async function fetchHistoryWithRetry(
  * @param savedFilenames - Array to collect saved filenames.
  * @returns Array of saved full paths.
  */
-async function processOutputs(
+export async function processOutputs(
   outputs: Record<string, any>,
   workflow: any,
   workspaceFolder: vscode.WorkspaceFolder,

@@ -2,7 +2,7 @@
   "name": "vscode-comfyui-linker",
   "displayName": "ComfyUI Linker",
   "description": "A VSCode extension to generate images using ComfyUI",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "icon": "icon.png",
   "engines": {
     "vscode": "^1.80.0"
@@ -57,8 +57,9 @@
     "watch": "tsc -watch -p ./"
   },
   "devDependencies": {
-    "@types/vscode": "^1.80.0",
     "@types/node": "16.x",
+    "@types/vscode": "^1.80.0",
+    "@types/ws": "^8.18.1",
     "typescript": "~5.1.6"
   },
   "dependencies": {
