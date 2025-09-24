@@ -1,38 +1,275 @@
 import * as vscode from 'vscode';
-import { generateImage } from './comfyui';
+import { generateImage, previewImage, saveImage } from './comfyui';
+
+let previewPanel: vscode.WebviewPanel | undefined;
+
+const INITIAL_HTML = `
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ComfyUI Preview</title>
+  </head>
+  <body>
+    <h1>Generating Image...</h1>
+    <div id="progress">Starting generation...</div>
+    <img id="previewImage" style="max-width: 100%; display: none;" alt="Preview Image" />
+    <script>
+      const vscode = acquireVsCodeApi();
+      window.addEventListener('message', event => {
+        const message = event.data;
+        switch (message.type) {
+          case 'progress':
+            document.getElementById('progress').innerText = message.progress;
+            break;
+          case 'preview':
+            const img = document.getElementById('previewImage');
+            img.src = message.dataUrl;
+            img.style.display = 'block';
+            document.querySelector('h1').style.display = 'none';
+            break;
+        }
+      });
+    </script>
+  </body>
+</html>
+`;
+
+function getOrCreatePanel(): vscode.WebviewPanel {
+  if (previewPanel) {
+    previewPanel.webview.html = INITIAL_HTML;
+    return previewPanel;
+  }
+
+  const panel = vscode.window.createWebviewPanel(
+    'comfyuiPreview',
+    'ComfyUI Preview',
+    vscode.ViewColumn.One,
+    { enableScripts: true }
+  );
+
+  previewPanel = panel;
+
+  panel.onDidDispose(() => {
+    previewPanel = undefined;
+  });
+
+  panel.webview.html = INITIAL_HTML;
+
+  return panel;
+}
+
+let commandRegistered = false;
 
 export function activate(context: vscode.ExtensionContext) {
-  const disposable = vscode.commands.registerCommand('comfyui.generateImage', async () => {
-    const config = vscode.workspace.getConfiguration('comfyui');
-    console.log('Retrieved workflowTemplate from config:', config.get('workflowTemplate'));
+  const commandId = 'comfyui.generateImage';
 
-    const prompt = await vscode.window.showInputBox({
-      prompt: 'Enter your image generation prompt',
-      placeHolder: 'e.g., a beautiful landscape',
-      validateInput: (value) => {
-        if (!value || value.trim().length === 0) {
-          return 'Prompt cannot be empty.';
+  if (!commandRegistered) {
+    commandRegistered = true;
+    const disposable = vscode.commands.registerCommand(commandId, async () => {
+      // Validate workspace
+      const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+      if (!workspaceFolder) {
+        vscode.window.showErrorMessage('No workspace folder open. Please open a folder to save generated images.');
+        return;
+      }
+
+      const config = vscode.workspace.getConfiguration('comfyui');
+      console.log('Retrieved workflowTemplate from config:', config.get('workflowTemplate'));
+
+      // Prompt for serverUrl if not set
+      let serverUrl = config.get<string>('serverUrl');
+      if (!serverUrl) {
+        serverUrl = await vscode.window.showInputBox({
+          prompt: 'Enter ComfyUI server URL',
+          placeHolder: 'e.g., http://localhost:8188',
+          validateInput: (value) => {
+            if (!value || !value.startsWith('http')) {
+              return 'Server URL must be a valid HTTP URL.';
+            }
+            return null;
+          }
+        });
+        if (!serverUrl) {
+          return;
         }
-        return null;
+        // Save to config
+        await config.update('serverUrl', serverUrl, vscode.ConfigurationTarget.Workspace);
+      }
+
+      const prompt = await vscode.window.showInputBox({
+        prompt: 'Enter your image generation prompt',
+        placeHolder: 'e.g., a beautiful landscape',
+        validateInput: (value) => {
+          if (!value || value.trim().length === 0) {
+            return 'Prompt cannot be empty.';
+          }
+          return null;
+        }
+      });
+
+      if (!prompt) {
+        return;
+      }
+
+      const panel = getOrCreatePanel();
+
+      // Define callbacks
+      const updatePreview = (dataUrl: string) => {
+        panel.webview.postMessage({ type: 'preview', dataUrl });
+      };
+    
+      const updateProgress = (progress: number) => {
+        panel.webview.postMessage({ type: 'progress', progress: `${Math.round(progress * 100)}%` });
+      };
+
+      try {
+        vscode.window.showInformationMessage('Generating image with ComfyUI...');
+        const filenames = await generateImage(prompt, config, updatePreview, updateProgress);
+        const message = `Image(s) generated and saved: ${filenames.join(', ')}`;
+        vscode.window.showInformationMessage(message);
+        panel.reveal(vscode.ViewColumn.One);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'An unknown error occurred.';
+        vscode.window.showErrorMessage(`Failed to generate image: ${message}`);
+        // Optionally dispose panel on error
+        // panel.dispose();
       }
     });
 
-    if (!prompt) {
-      return;
-    }
+    context.subscriptions.push(disposable);
 
-    try {
-      vscode.window.showInformationMessage('Generating image with ComfyUI...');
-      const filenames = await generateImage(prompt, config);
-      const message = `Image(s) generated and saved: ${filenames.join(', ')}`;
-      vscode.window.showInformationMessage(message);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'An unknown error occurred.';
-      vscode.window.showErrorMessage(`Failed to generate image: ${message}`);
-    }
-  });
+    // Register preview command
+    const previewDisposable = vscode.commands.registerCommand('comfyui.preview', async () => {
+      // Validate workspace
+      const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+      if (!workspaceFolder) {
+        vscode.window.showErrorMessage('No workspace folder open. Please open a folder.');
+        return;
+      }
 
-  context.subscriptions.push(disposable);
+      const config = vscode.workspace.getConfiguration('comfyui');
+
+      // Prompt for serverUrl if not set
+      let serverUrl = config.get<string>('serverUrl');
+      if (!serverUrl) {
+        serverUrl = await vscode.window.showInputBox({
+          prompt: 'Enter ComfyUI server URL',
+          placeHolder: 'e.g., http://localhost:8188',
+          validateInput: (value) => {
+            if (!value || !value.startsWith('http')) {
+              return 'Server URL must be a valid HTTP URL.';
+            }
+            return null;
+          }
+        });
+        if (!serverUrl) {
+          return;
+        }
+        // Save to config
+        await config.update('serverUrl', serverUrl, vscode.ConfigurationTarget.Workspace);
+      }
+
+      const prompt = await vscode.window.showInputBox({
+        prompt: 'Enter your image preview prompt',
+        placeHolder: 'e.g., a beautiful landscape',
+        validateInput: (value) => {
+          if (!value || value.trim().length === 0) {
+            return 'Prompt cannot be empty.';
+          }
+          return null;
+        }
+      });
+
+      if (!prompt) {
+        return;
+      }
+
+      const panel = getOrCreatePanel();
+
+      try {
+        vscode.window.showInformationMessage('Generating preview with ComfyUI...');
+        const dataUrl = await previewImage(prompt, config);
+        console.log('Preview dataUrl received in extension:', dataUrl);
+        panel.webview.postMessage({ type: 'preview', dataUrl });
+        panel.reveal(vscode.ViewColumn.One);
+        vscode.window.showInformationMessage('Preview generated successfully.');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'An unknown error occurred.';
+        vscode.window.showErrorMessage(`Failed to generate preview: ${message}`);
+        // Optionally dispose panel on error
+        // panel.dispose();
+      }
+    });
+
+    context.subscriptions.push(previewDisposable);
+
+    // Register save command
+    const saveDisposable = vscode.commands.registerCommand('comfyui.save', async () => {
+      // Validate workspace
+      const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+      if (!workspaceFolder) {
+        vscode.window.showErrorMessage('No workspace folder open. Please open a folder to save generated images.');
+        return;
+      }
+
+      const config = vscode.workspace.getConfiguration('comfyui');
+
+      // Prompt for serverUrl if not set
+      let serverUrl = config.get<string>('serverUrl');
+      if (!serverUrl) {
+        serverUrl = await vscode.window.showInputBox({
+          prompt: 'Enter ComfyUI server URL',
+          placeHolder: 'e.g., http://localhost:8188',
+          validateInput: (value) => {
+            if (!value || !value.startsWith('http')) {
+              return 'Server URL must be a valid HTTP URL.';
+            }
+            return null;
+          }
+        });
+        if (!serverUrl) {
+          return;
+        }
+        // Save to config
+        await config.update('serverUrl', serverUrl, vscode.ConfigurationTarget.Workspace);
+      }
+
+      const prompt = await vscode.window.showInputBox({
+        prompt: 'Enter your image save prompt',
+        placeHolder: 'e.g., a beautiful landscape',
+        validateInput: (value) => {
+          if (!value || value.trim().length === 0) {
+            return 'Prompt cannot be empty.';
+          }
+          return null;
+        }
+      });
+
+      if (!prompt) {
+        return;
+      }
+
+      try {
+        vscode.window.showInformationMessage('Generating and saving image with ComfyUI...');
+        const filePath = await saveImage(prompt, config);
+        vscode.window.showInformationMessage(`Image saved successfully: ${filePath}`);
+        // Optionally open the file
+        try {
+          const doc = await vscode.workspace.openTextDocument(filePath);
+          await vscode.window.showTextDocument(doc);
+        } catch (openError) {
+          console.log('Could not open image file in editor:', openError);
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'An unknown error occurred.';
+        vscode.window.showErrorMessage(`Failed to save image: ${message}`);
+      }
+    });
+
+    context.subscriptions.push(saveDisposable);
+  }
 }
 
 export function deactivate() {}
