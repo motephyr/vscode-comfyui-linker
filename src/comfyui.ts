@@ -272,7 +272,8 @@ export async function generateImage(
   prompt: string,
   config: vscode.WorkspaceConfiguration,
   onPreviewCallback?: (dataUrl: string) => void,
-  onProgressCallback?: (progress: number) => void
+  onProgressCallback?: (progress: number) => void,
+  outputChannel?: vscode.OutputChannel
 ): Promise<string[]> {
   const savedFilenames: string[] = [];
 
@@ -377,6 +378,13 @@ export async function generateImage(
       wsManager.connect();
     }
 
+    if (onProgressCallback) {
+      onProgressCallback(0);
+    }
+    if (outputChannel) {
+      outputChannel.appendLine('開始圖像生成：0%');
+    }
+
     // Poll /history/{promptId} every 2s, up to 5min
     const maxAttempts = 150;
     let attempts = 0;
@@ -393,9 +401,26 @@ export async function generateImage(
       const entry = historyData?.[promptId];
 
       if (entry && entry.outputs) {
+        if (onProgressCallback) {
+          onProgressCallback(1);
+        }
+        if (outputChannel) {
+          outputChannel.appendLine('圖像生成完成：100%');
+        }
         break;
       } else if (!entry) {
         // In progress
+        const numPolls = attempts + 1;
+        const effectiveMaxPolls = 30;
+        let progress = (numPolls / effectiveMaxPolls) * 0.9;
+        if (progress > 0.9) progress = 0.9;
+        if (onProgressCallback) {
+          onProgressCallback(progress);
+        }
+        if (outputChannel) {
+          const percent = Math.round(progress * 100);
+          outputChannel.appendLine(`輪詢進度：${percent}% (第 ${numPolls} 次輪詢)`);
+        }
       } else {
         throw new Error('Prompt execution failed on server (entry without outputs).');
       }

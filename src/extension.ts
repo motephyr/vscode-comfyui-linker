@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { generateImage } from './comfyui';
 
 let previewPanel: vscode.WebviewPanel | undefined;
+let outputChannel: vscode.OutputChannel;
 
 const INITIAL_HTML = `
   <!DOCTYPE html>
@@ -13,27 +14,35 @@ const INITIAL_HTML = `
   </head>
   <body>
     <h1>Generating Image...</h1>
-    <div id="progress">Starting generation...</div>
+    <div id="progress-container" style="margin: 20px 0;">
+      <div style="margin-bottom: 10px; font-size: 16px;">Percentage: <span id="progress-text">0%</span></div>
+      <div style="width: 100%; background-color: #ddd; height: 20px; border-radius: 10px;">
+        <div id="progress-bar" style="width: 0%; background-color: #4CAF50; height: 20px; border-radius: 10px; transition: width 0.3s ease-in-out;"></div>
+      </div>
+    </div>
     <img id="previewImage" style="max-width: 100%; display: none;" alt="Preview Image" />
     <script>
       const vscode = acquireVsCodeApi();
       window.addEventListener('message', event => {
         const message = event.data;
-        switch (message.type) {
+        switch (message.command) {
           case 'progress':
-            document.getElementById('progress').innerText = message.progress;
+            const percentage = message.percentage;
+            document.getElementById('progress-text').innerText = percentage + '%';
+            document.getElementById('progress-bar').style.width = percentage + '%';
             break;
           case 'preview':
             const img = document.getElementById('previewImage');
             img.src = message.dataUrl;
             img.style.display = 'block';
             document.querySelector('h1').style.display = 'none';
+            document.getElementById('progress-container').style.display = 'none';
             break;
         }
       });
     </script>
   </body>
-</html>
+  </html>
 `;
 
 function getOrCreatePanel(): vscode.WebviewPanel {
@@ -63,6 +72,7 @@ function getOrCreatePanel(): vscode.WebviewPanel {
 let commandRegistered = false;
 
 export function activate(context: vscode.ExtensionContext) {
+  outputChannel = vscode.window.createOutputChannel('ComfyUI Linker');
   const commandId = 'comfyui.generateImage';
 
   if (!commandRegistered) {
@@ -117,16 +127,17 @@ export function activate(context: vscode.ExtensionContext) {
 
       // Define callbacks
       const updatePreview = (dataUrl: string) => {
-        panel.webview.postMessage({ type: 'preview', dataUrl });
+        panel.webview.postMessage({ command: 'preview', dataUrl });
       };
     
       const updateProgress = (progress: number) => {
-        panel.webview.postMessage({ type: 'progress', progress: `${Math.round(progress * 100)}%` });
+        const percentage = Math.round(progress * 100);
+        panel.webview.postMessage({ command: 'progress', percentage });
       };
 
       try {
         vscode.window.showInformationMessage('Generating image with ComfyUI...');
-        const filenames = await generateImage(prompt, config, updatePreview, updateProgress);
+        const filenames = await generateImage(prompt, config, updatePreview, updateProgress, outputChannel);
         const message = `Image(s) generated and saved: ${filenames.join(', ')}`;
         vscode.window.showInformationMessage(message);
         panel.reveal(vscode.ViewColumn.One);
