@@ -33,7 +33,52 @@
         "command": "comfyui.generateImageFromImage",
         "title": "ComfyUI: Generate Image from Image and Prompt"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "ComfyUI Linker",
+      "properties": {
+        "comfyui.serverUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:8188",
+          "description": "Base URL of the ComfyUI server."
+        },
+        "comfyui.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "API key for authentication (if required)."
+        },
+        "comfyui.workflowTemplate": {
+          "type": "string",
+          "default": "",
+          "description": "JSON template for the text-to-image workflow. Use {{prompt}} as a placeholder."
+        },
+        "comfyui.promptNodeId": {
+          "type": "string",
+          "default": "4",
+          "description": "The ID of the node that receives the text prompt."
+        },
+        "comfyui.promptInputKey": {
+          "type": "string",
+          "default": "text",
+          "description": "The key for the prompt input within the node."
+        },
+        "comfyui.workflowTemplateImg2Img": {
+          "type": "string",
+          "default": "",
+          "description": "JSON template for the image-to-image workflow. Use {{prompt}} for text and the image node for the image."
+        },
+        "comfyui.imgNodeId": {
+          "type": "string",
+          "default": "",
+          "description": "The ID of the node that receives the input image for img2img."
+        },
+        "comfyui.imgNodeInputKey": {
+          "type": "string",
+          "default": "image",
+          "description": "The key for the image input within the img2img node."
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

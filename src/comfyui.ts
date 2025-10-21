@@ -510,9 +510,18 @@ export async function generateImageFromImage(
     const uploadResponse = await uploadImage(serverUrl, imagePath);
     const imageName = uploadResponse.name;
 
+    const workflowTemplateStr = config.get<string>('workflowTemplateImg2Img', IMG2IMG_WORKFLOW_TEMPLATE);
+    const imgNodeId = config.get<string>('imgNodeId', '10');
+    const imgNodeInputKey = config.get<string>('imgNodeInputKey', 'image');
+    const promptNodeId = config.get<string>('promptNodeId', '6');
+    const promptInputKey = config.get<string>('promptInputKey', 'text');
+
     let template: any;
     try {
-      template = JSON.parse(IMG2IMG_WORKFLOW_TEMPLATE);
+      template = JSON.parse(workflowTemplateStr);
+      if (!template || typeof template !== 'object') {
+        throw new Error('Invalid workflow template structure.');
+      }
     } catch (parseError) {
       console.warn('Failed to parse img2img workflow template, using default:', parseError);
       template = JSON.parse(IMG2IMG_WORKFLOW_TEMPLATE);
@@ -520,8 +529,17 @@ export async function generateImageFromImage(
 
     const workflow = structuredClone(template);
 
-    workflow['10'].inputs.image = imageName;
-    workflow['6'].inputs.text = prompt;
+    if (imgNodeId && workflow[imgNodeId] && workflow[imgNodeId].inputs) {
+      workflow[imgNodeId].inputs[imgNodeInputKey] = imageName;
+    } else {
+      throw new Error('Could not insert image into img2img workflow template. Check imgNodeId and imgNodeInputKey settings.');
+    }
+
+    if (promptNodeId && workflow[promptNodeId] && workflow[promptNodeId].inputs) {
+      workflow[promptNodeId].inputs[promptInputKey] = prompt;
+    } else {
+      throw new Error('Could not insert prompt into img2img workflow template. Check promptNodeId and promptInputKey settings.');
+    }
 
     const payload: any = {
       prompt: workflow,
