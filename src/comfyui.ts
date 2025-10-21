@@ -108,6 +108,8 @@ export class WebSocketManager {
 
 export const DEFAULT_WORKFLOW_TEMPLATE = `{"3":{"inputs":{"text":"negative prompt","clip":["4",0]},"class_type":"CLIPTextEncode","_meta":{"title":"CLIP Text Encode (Prompt)"}},"4":{"inputs":{"ckpt_name":"sd15.safetensors"},"class_type":"CheckpointLoaderSimple","_meta":{"title":"Load Checkpoint"}},"5":{"inputs":{"width":512,"height":512,"batch_size":1},"class_type":"EmptyLatentImage","_meta":{"title":"Empty Latent Image"}},"6":{"inputs":{"text":"a beautiful landscape","clip":["4",0]},"class_type":"CLIPTextEncode","_meta":{"title":"CLIP Text Encode (Prompt)"}},"7":{"inputs":{"seed":123456789,"steps":20,"cfg":8,"sampler_name":"euler","scheduler":"normal","denoise":1,"model":["4",0],"positive":["6",0],"negative":["3",0],"latent_image":["5",0]},"class_type":"KSampler","_meta":{"title":"KSampler"}},"8":{"inputs":{"samples":["7",0],"vae":["4",2]},"class_type":"VAEDecode","_meta":{"title":"VAE Decode"}},"9":{"inputs":{"filename_prefix":"ComfyUI","images":["8",0]},"class_type":"SaveImage","_meta":{"title":"Save Image"}},"links":[["4",0,"6",1],["4",0,"3",1],["5",0,"7",3],["6",0,"7",1],["3",0,"7",2],["4",0,"7",0],["7",0,"8",0],["4",2,"8",1],["8",0,"9",0]],"version":0.4}`;
 
+export const IMG2IMG_WORKFLOW_TEMPLATE = `{"3":{"inputs":{"text":"negative prompt","clip":["4",0]},"class_type":"CLIPTextEncode","_meta":{"title":"CLIP Text Encode (Prompt)"}},"4":{"inputs":{"ckpt_name":"sd15.safetensors"},"class_type":"CheckpointLoaderSimple","_meta":{"title":"Load Checkpoint"}},"5":{"inputs":{"image":"example.png","vae":["4",2]},"class_type":"VAEEncode","_meta":{"title":"VAE Encode"}},"6":{"inputs":{"text":"a beautiful landscape","clip":["4",0]},"class_type":"CLIPTextEncode","_meta":{"title":"CLIP Text Encode (Prompt)"}},"7":{"inputs":{"seed":123456789,"steps":20,"cfg":8,"sampler_name":"euler","scheduler":"normal","denoise":0.8,"model":["4",0],"positive":["6",0],"negative":["3",0],"latent_image":["5",0]},"class_type":"KSampler","_meta":{"title":"KSampler"}},"8":{"inputs":{"samples":["7",0],"vae":["4",2]},"class_type":"VAEDecode","_meta":{"title":"VAE Decode"}},"9":{"inputs":{"filename_prefix":"ComfyUI","images":["8",0]},"class_type":"SaveImage","_meta":{"title":"Save Image"}},"10":{"inputs":{"image":"example.png"},"class_type":"LoadImage","_meta":{"title":"Load Image"}},"links":[["3",0,"7",2],["4",0,"3",1],["4",0,"6",1],["4",0,"7",0],["4",2,"8",1],["5",0,"7",3],["6",0,"7",1],["7",0,"8",0],["8",0,"9",0],["10",0,"5",0]],"version":0.4}`;
+
 /**
  * Fetches an image from the ComfyUI server with retry logic for transient errors.
  * @param serverUrl - The ComfyUI server URL.
@@ -268,6 +270,28 @@ export async function processOutputs(
  * @returns Array of saved image file paths.
  * @throws Error on validation, submission, or processing failures.
  */
+
+export async function uploadImage(serverUrl: string, imagePath: string): Promise<any> {
+  const filename = path.basename(imagePath);
+  const imageBuffer = fs.readFileSync(imagePath);
+
+  const response = await fetch(`${serverUrl}/upload/image`, {
+    method: 'POST',
+    headers: {
+      'Content-Disposition': `form-data; name="image"; filename="${filename}"`,
+      'Content-Type': 'image/png', // Or the correct mime type
+      'Content-Length': imageBuffer.length.toString(),
+    },
+    body: imageBuffer,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to upload image: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
 export async function generateImage(
   prompt: string,
   config: vscode.WorkspaceConfiguration,
@@ -460,6 +484,147 @@ export async function generateImage(
     }
   }
 }
+
+export async function generateImageFromImage(
+  prompt: string,
+  imagePath: string,
+  config: vscode.WorkspaceConfiguration,
+  onPreviewCallback?: (dataUrl: string) => void,
+  onProgressCallback?: (progress: number) => void,
+  outputChannel?: vscode.OutputChannel
+): Promise<string[]> {
+  const savedFilenames: string[] = [];
+
+  try {
+    const serverUrl = config.get<string>('serverUrl', 'http://localhost:8188');
+    const apiKey = config.get<string>('apiKey');
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) {
+      throw new Error('No workspace folder open.');
+    }
+
+    if (!serverUrl || !serverUrl.startsWith('http')) {
+      throw new Error('Invalid server URL. Must be a valid HTTP URL.');
+    }
+
+    const uploadResponse = await uploadImage(serverUrl, imagePath);
+    const imageName = uploadResponse.name;
+
+    let template: any;
+    try {
+      template = JSON.parse(IMG2IMG_WORKFLOW_TEMPLATE);
+    } catch (parseError) {
+      console.warn('Failed to parse img2img workflow template, using default:', parseError);
+      template = JSON.parse(IMG2IMG_WORKFLOW_TEMPLATE);
+    }
+
+    const workflow = structuredClone(template);
+
+    workflow['10'].inputs.image = imageName;
+    workflow['6'].inputs.text = prompt;
+
+    const payload: any = {
+      prompt: workflow,
+      client_id: 'vscode-extension'
+    };
+
+    if (apiKey) {
+      payload.extra_data = { api_key_comfy_org: apiKey };
+    }
+
+    const promptResponse = await fetch(`${serverUrl}/prompt`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!promptResponse.ok) {
+      throw new Error(`Failed to submit prompt: ${promptResponse.statusText}`);
+    }
+
+    const promptData = await promptResponse.json();
+    const promptId = promptData.prompt_id;
+    if (!promptId) {
+      throw new Error('No prompt ID received from server.');
+    }
+
+    if (onProgressCallback) {
+      onProgressCallback(0);
+    }
+    if (outputChannel) {
+      outputChannel.appendLine('開始圖像生成：0%');
+    }
+
+    const maxAttempts = 150;
+    let attempts = 0;
+    let historyData: Record<string, any> | null = null;
+
+    while (attempts < maxAttempts) {
+      const historyResponse = await fetch(`${serverUrl}/history/${promptId}`);
+      if (!historyResponse.ok) {
+        throw new Error(`Failed to fetch history: ${historyResponse.statusText}`);
+      }
+
+      historyData = await historyResponse.json();
+      const entry = historyData?.[promptId];
+
+      if (entry && entry.outputs) {
+        if (onProgressCallback) {
+          onProgressCallback(1);
+        }
+        if (outputChannel) {
+          outputChannel.appendLine('圖像生成完成：100%');
+        }
+        break;
+      } else if (!entry) {
+        const numPolls = attempts + 1;
+        const effectiveMaxPolls = 30;
+        let progress = (numPolls / effectiveMaxPolls) * 0.9;
+        if (progress > 0.9) progress = 0.9;
+        if (onProgressCallback) {
+          onProgressCallback(progress);
+        }
+        if (outputChannel) {
+          const percent = Math.round(progress * 100);
+          outputChannel.appendLine(`輪詢進度：${percent}% (第 ${numPolls} 次輪詢)`);
+        }
+      } else {
+        throw new Error('Prompt execution failed on server (entry without outputs).');
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      attempts++;
+    }
+
+    if (!historyData || !historyData[promptId]) {
+      throw new Error('Timeout: Prompt did not complete within 5 minutes.');
+    }
+
+    const outputs = historyData[promptId].outputs as Record<string, any>;
+    if (!outputs) {
+      throw new Error('No outputs in history.');
+    }
+
+    const timestamp = Date.now();
+    await processOutputs(outputs, workflow, workspaceFolder, serverUrl, timestamp, savedFilenames);
+
+    if (savedFilenames.length > 0) {
+      vscode.window.showInformationMessage(`Generated ${savedFilenames.length} image(s).`);
+      return savedFilenames;
+    } else {
+      throw new Error('No images generated or saved.');
+    }
+  } catch (error) {
+    console.error('Error in generateImageFromImage:', error);
+    if (error instanceof Error) {
+      throw error;
+    } else {
+      throw new Error(`Unexpected error: ${error}`);
+    }
+  }
+}
+
+
 export async function previewImage(
   prompt: string,
   config: vscode.WorkspaceConfiguration

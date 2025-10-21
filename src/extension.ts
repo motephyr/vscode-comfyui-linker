@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { generateImage } from './comfyui';
+import { generateImage, generateImageFromImage } from './comfyui';
 
 let previewPanel: vscode.WebviewPanel | undefined;
 let outputChannel: vscode.OutputChannel;
@@ -149,7 +149,66 @@ export function activate(context: vscode.ExtensionContext) {
       }
     });
 
-    context.subscriptions.push(disposable);
+    const img2imgDisposable = vscode.commands.registerCommand('comfyui.generateImageFromImage', async () => {
+      const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+      if (!workspaceFolder) {
+        vscode.window.showErrorMessage('No workspace folder open. Please open a folder to save generated images.');
+        return;
+      }
+
+      const config = vscode.workspace.getConfiguration('comfyui');
+
+      const imageUri = await vscode.window.showOpenDialog({
+        canSelectMany: false,
+        openLabel: 'Select Image',
+        filters: { 'Images': ['png', 'jpg', 'jpeg', 'webp'] }
+      });
+
+      if (!imageUri || imageUri.length === 0) {
+        return;
+      }
+
+      const imagePath = imageUri[0].fsPath;
+
+      const prompt = await vscode.window.showInputBox({
+        prompt: 'Enter your image generation prompt',
+        placeHolder: 'e.g., a beautiful landscape',
+        validateInput: (value) => {
+          if (!value || value.trim().length === 0) {
+            return 'Prompt cannot be empty.';
+          }
+          return null;
+        }
+      });
+
+      if (!prompt) {
+        return;
+      }
+
+      const panel = getOrCreatePanel();
+
+      const updatePreview = (dataUrl: string) => {
+        panel.webview.postMessage({ command: 'preview', dataUrl });
+      };
+
+      const updateProgress = (progress: number) => {
+        const percentage = Math.round(progress * 100);
+        panel.webview.postMessage({ command: 'progress', percentage });
+      };
+
+      try {
+        vscode.window.showInformationMessage('Generating image with ComfyUI...');
+        const filenames = await generateImageFromImage(prompt, imagePath, config, updatePreview, updateProgress, outputChannel);
+        const message = `Image(s) generated and saved: ${filenames.join(', ')}`;
+        vscode.window.showInformationMessage(message);
+        panel.reveal(vscode.ViewColumn.One);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'An unknown error occurred.';
+        vscode.window.showErrorMessage(`Failed to generate image: ${message}`);
+      }
+    });
+
+    context.subscriptions.push(disposable, img2imgDisposable);
 
   }
 }
