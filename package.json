@@ -3,7 +3,7 @@
   "displayName": "ComfyUI Linker",
   "publisher": "markuswu",
   "description": "Generate AI images with ComfyUI workflows directly in VSCode. Enter text prompts, monitor real-time progress via WebSocket, and auto-save outputs to your workspace.",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "icon": "icon.png",
   "engines": {
     "vscode": "^1.80.0"
